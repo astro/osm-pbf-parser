@@ -68,10 +68,12 @@ Parser.prototype._transform = function write (buf, enc, next) {
                 var group = parsers.primitiveGroup.decode(
                     self._osmdata.primitivegroup
                 );
-                var row = {};
+                var row = { type: 'group' };
                 if (group.dense_nodes) {
                     var dense = parsers.dense.decode(group.dense_nodes);
-                    row.points = parsePairs(dense.lat, dense.lon);
+                    row.points = parsePairs(
+                        dense.lat, dense.lon, self._osmdata
+                    );
                     self.push(row);
                 }
             }
@@ -85,12 +87,16 @@ Parser.prototype._transform = function write (buf, enc, next) {
     }
 }
 
-function parsePairs (a, b) {
+function parsePairs (a, b, data) {
     var pairs = [];
     for (var i = 0; i < a.length;) {
-        var x = varint.decode(a, i);
-        var y = varint.decode(b, i);
+        var xv = varint.decode(a, i);
+        var yv = varint.decode(b, i);
         i += varint.decode.bytesRead;
+        
+        var g = data.granularity || 100;
+        var x = 0.000000001 * ((data.lat_offset || 0) + (g * xv));
+        var y = 0.000000001 * ((data.lon_offset || 0) + (g * xv));
         pairs.push([ x, y ]);
     }
     return pairs;
