@@ -1,6 +1,6 @@
 var zlib = require('zlib');
 var parsers = require('./lib/parsers.js');
-var varint = require('varint');
+var varint = require('signed-varint');
 var Transform = require('readable-stream').Transform;
 var inherits = require('inherits');
 

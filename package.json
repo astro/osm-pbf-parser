@@ -1,0 +1,36 @@
+{
+  "name": "osm-pbf-parser",
+  "version": "1.0.0",
+  "description": "open street maps protocol buffer parser",
+  "main": "index.js",
+  "dependencies": {
+    "inherits": "~2.0.1",
+    "protocol-buffers": "~1.0.0",
+    "readable-stream": "~1.0.27-1",
+    "signed-varint": "~1.0.0"
+  },
+  "devDependencies": {
+    "tape": "~2.12.1"
+  },
+  "scripts": {
+    "test": "tape test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/substack/osm-pbf-parser.git"
+  },
+  "homepage": "https://github.com/substack/osm-pbf-parser",
+  "keywords": [
+    "osm",
+    "openstreetmaps",
+    "protobuf",
+    "streaming",
+    "parser"
+  ],
+  "author": {
+    "name": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net"
+  },
+  "license": "MIT"
+}
