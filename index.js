@@ -96,7 +96,7 @@ function parsePairs (a, b, data) {
         
         var g = data.granularity || 100;
         var x = 0.000000001 * ((data.lat_offset || 0) + (g * xv));
-        var y = 0.000000001 * ((data.lon_offset || 0) + (g * xv));
+        var y = 0.000000001 * ((data.lon_offset || 0) + (g * yv));
         pairs.push([ x, y ]);
     }
     return pairs;
