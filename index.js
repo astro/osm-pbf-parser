@@ -88,8 +88,8 @@ Parser.prototype._transform = function write (buf, enc, next) {
 function parsePairs (a, b) {
     var pairs = [];
     for (var i = 0; i < a.length;) {
-        var x = varint.decode(dense.lat, i);
-        var y = varint.decode(dense.lon, i);
+        var x = varint.decode(a, i);
+        var y = varint.decode(b, i);
         i += varint.decode.bytesRead;
         pairs.push([ x, y ]);
     }
