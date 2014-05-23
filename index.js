@@ -38,12 +38,12 @@ Parser.prototype._transform = function write (buf, enc, next) {
     if (this._mode === SIZE) {
         this._sizeOffset = this._offset;
         var len = buf.readUInt32BE(0);
-        mode = HEADER;
+        this._mode = HEADER;
         this._offset += this._waiting;
         this._waiting = len;
         write.call(this, buf.slice(4), enc, next);
     }
-    else if (mode === HEADER) {
+    else if (this._mode === HEADER) {
         this._header = parsers.header.decode(buf.slice(0, this._waiting));
         this._mode = BLOB;
         var nbuf = buf.slice(this._waiting);
@@ -51,8 +51,8 @@ Parser.prototype._transform = function write (buf, enc, next) {
         this._waiting = this._header.datasize;
         write.call(this, nbuf, enc, next);
     }
-    else if (mode === 'blob') {
-        this._blob = parsers.blob.decode(buf.slice(0, waiting));
+    else if (this._mode === BLOB) {
+        this._blob = parsers.blob.decode(buf.slice(0, this._waiting));
         
         var h = this._header;
         var o = this._offset;
