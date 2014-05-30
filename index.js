@@ -12,7 +12,9 @@ var SIZE = 0, HEADER = 1, BLOB = 2;
 
 function Parser () {
     if (!(this instanceof Parser)) return new Parser;
-    Transform.call(this, { objectMode: true });
+    Transform.call(this);
+    this._readableState.objectMode = true;
+    this._writableState.objectMode = false;
     this._mode = SIZE;
     this._waiting = 4;
     this._prev = null;
