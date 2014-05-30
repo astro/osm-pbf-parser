@@ -136,7 +136,7 @@ function parseDenseNodes (dense, osmdata, stringtable) {
         var g = osmdata.granularity || 100;
         var lat = 0.000000001 * ((osmdata.lat_offset || 0) + (g * xv));
         var lon = 0.000000001 * ((osmdata.lon_offset || 0) + (g * yv));
-
+        
         var key = null, tags = {};
         var sIndex;
         while ((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0
