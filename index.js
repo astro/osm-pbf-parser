@@ -70,10 +70,16 @@ Parser.prototype._transform = function write (buf, enc, next) {
                 var group = parsers.primitiveGroup.decode(
                     self._osmdata.primitivegroup
                 );
-                var row = { type: 'group' };
+                var row = {};
                 if (group.dense_nodes) {
+                    row.type = 'nodes';
                     var dense = parsers.dense.decode(group.dense_nodes);
                     row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
+                    self.push(row);
+                } else if (group.way) {
+                    row.type = 'way';
+                    var way = parsers.way.decode(group.way);
+                    row.way = parseWay(way, self.stringtable);
                     self.push(row);
                 } else {
                     console.log("Unknown group", group);
@@ -150,4 +156,38 @@ function parseDenseNodes (dense, osmdata, stringtable) {
         });
     }
     return nodes;
+}
+
+function parseWay (data, stringtable) {
+    var tags = {};
+    if (data.keys && data.values) {
+        var kOffset, vOffset;
+        for(kOffset = 0, vOffset = 0; kOffset < data.keys.length && vOffset < data.values.length; ) {
+            var kIndex = varint.decode(data.keys, kOffset);
+            kOffset += varint.decode.bytesRead;
+            var vIndex = varint.decode(data.values, vOffset);
+            vOffset += varint.decode.bytesRead;
+
+            var key = stringtable[kIndex];
+            var value = stringtable[vIndex];
+            tags[key] = value;
+        }
+    }
+
+    var refs = [];
+    if (data.refs) {
+        var rOffset, r0 = 0;
+        for(rOffset = 0; rOffset < data.refs.length; ) {
+            var r = r0 + varint.decode(data.refs, rOffset);
+            rOffset += varint.decode.bytesRead;
+            r0 = r;
+            refs.push(r);
+        }
+    }
+
+    return {
+        id: data.id,
+        tags: tags,
+        refs: refs
+    };
 }
