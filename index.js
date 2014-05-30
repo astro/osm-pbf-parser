@@ -59,6 +59,12 @@ Parser.prototype._transform = function write (buf, enc, next) {
         
         var h = this._header;
         var o = this._offset;
+
+        this._mode = SIZE;
+        var nbuf = buf.slice(this._waiting);
+        this._offset += this._waiting;
+        this._waiting = 4;
+
         zlib.inflate(this._blob.zlib_data, function (err, data) {
             if (err) self.emit('error', err);
             
@@ -87,13 +93,9 @@ Parser.prototype._transform = function write (buf, enc, next) {
                     console.log("Unknown group", group);
                 }
             }
+
+            write.call(self, nbuf, enc, next);
         });
-        
-        this._mode = SIZE;
-        var nbuf = buf.slice(this._waiting);
-        this._offset += this._waiting;
-        this._waiting = 4;
-        write.call(this, nbuf, enc, next);
     }
 }
 
