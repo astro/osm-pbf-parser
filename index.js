@@ -84,12 +84,14 @@ Parser.prototype._transform = function write (buf, enc, next) {
                     var dense = parsers.dense.decode(group.dense_nodes);
                     row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
                     self.push(row);
-                } else if (group.way) {
+                }
+                else if (group.way) {
                     row.type = 'way';
                     var way = parsers.way.decode(group.way);
                     row.way = parseWay(way, self.stringtable);
                     self.push(row);
-                } else {
+                }
+                else {
                     console.log("Unknown group", group);
                 }
             }
@@ -118,40 +120,40 @@ function parseDenseNodes (dense, osmdata, stringtable) {
     var nodes = [];
     var id0 = 0, xv0 = 0, yv0 = 0;
     var idOffset = 0, latOffset = 0, lonOffset = 0, kvOffset = 0;
-    for(idOffset = 0; idOffset < dense.id.length; ) {
+    while (idOffset < dense.id.length) {
         var id = id0 + signedVarint.decode(dense.id, idOffset);
         idOffset += signedVarint.decode.bytesRead;
         id0 = id;
-
+        
         var xv = xv0 + signedVarint.decode(dense.lat, latOffset);
         latOffset += signedVarint.decode.bytesRead;
         xv0 = xv;
-
+        
         var yv = yv0 + signedVarint.decode(dense.lon, lonOffset);
         lonOffset += signedVarint.decode.bytesRead;
         yv0 = yv;
-
+        
         var g = osmdata.granularity || 100;
         var lat = 0.000000001 * ((osmdata.lat_offset || 0) + (g * xv));
         var lon = 0.000000001 * ((osmdata.lon_offset || 0) + (g * yv));
 
         var key = null, tags = {};
         var sIndex;
-        while((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0 &&
-              kvOffset < dense.keys_vals.length
-             ) {
+        while ((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0
+        && kvOffset < dense.keys_vals.length) {
             kvOffset += varint.decode.bytesRead;
-
+            
             var s = stringtable[sIndex];
             if (key === null) {
                 key = s;
-            } else {
+            }
+            else {
                 tags[key] = s;
                 key = null;
             }
         }
         kvOffset += varint.decode.bytesRead;
-
+        
         nodes.push({
             id: id,
             lat: lat,
@@ -165,8 +167,8 @@ function parseDenseNodes (dense, osmdata, stringtable) {
 function parseWay (data, stringtable) {
     var tags = {};
     if (data.keys && data.values) {
-        var kOffset, vOffset;
-        for(kOffset = 0, vOffset = 0; kOffset < data.keys.length && vOffset < data.values.length; ) {
+        var kOffset = 0, vOffset = 0;
+        while (kOffset < data.keys.length && vOffset < data.values.length) {
             var kIndex = varint.decode(data.keys, kOffset);
             kOffset += varint.decode.bytesRead;
             var vIndex = varint.decode(data.values, vOffset);
