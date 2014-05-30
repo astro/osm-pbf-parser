@@ -1,6 +1,7 @@
 var zlib = require('zlib');
 var parsers = require('./lib/parsers.js');
-var varint = require('signed-varint');
+var varint = require('varint');
+var signedVarint = require('signed-varint');
 var Transform = require('readable-stream').Transform;
 var inherits = require('inherits');
 
@@ -64,6 +65,7 @@ Parser.prototype._transform = function write (buf, enc, next) {
             }
             else if (h.type === 'OSMData') {
                 self._osmdata = parsers.osmdata.decode(data);
+                self.stringtable = decodeStringtable(self._osmdata.stringtable);
                 
                 var group = parsers.primitiveGroup.decode(
                     self._osmdata.primitivegroup
@@ -71,10 +73,10 @@ Parser.prototype._transform = function write (buf, enc, next) {
                 var row = { type: 'group' };
                 if (group.dense_nodes) {
                     var dense = parsers.dense.decode(group.dense_nodes);
-                    row.points = parsePairs(
-                        dense.lat, dense.lon, self._osmdata
-                    );
+                    row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
                     self.push(row);
+                } else {
+                    console.log("Unknown group", group);
                 }
             }
         });
@@ -87,17 +89,65 @@ Parser.prototype._transform = function write (buf, enc, next) {
     }
 }
 
-function parsePairs (a, b, data) {
-    var pairs = [];
-    for (var i = 0; i < a.length;) {
-        var xv = varint.decode(a, i);
-        var yv = varint.decode(b, i);
+function decodeStringtable (buf) {
+    var strings = [];
+    for(var i = 0; i < buf.length; ) {
+        // Skip tag
+        i += 1;
+        // Read length
+        var len = varint.decode(buf, i);
         i += varint.decode.bytesRead;
-        
-        var g = data.granularity || 100;
-        var x = 0.000000001 * ((data.lat_offset || 0) + (g * xv));
-        var y = 0.000000001 * ((data.lon_offset || 0) + (g * yv));
-        pairs.push([ x, y ]);
+        // Extract string
+        strings.push(buf.slice(i, i + len).toString());
+        i += len;
     }
-    return pairs;
+    return strings;
+}
+
+function parseDenseNodes (dense, osmdata, stringtable) {
+    var nodes = [];
+    var id0 = 0, xv0 = 0, yv0 = 0;
+    var idOffset = 0, latOffset = 0, lonOffset = 0, kvOffset = 0;
+    for(idOffset = 0; idOffset < dense.id.length; ) {
+        var id = id0 + signedVarint.decode(dense.id, idOffset);
+        idOffset += signedVarint.decode.bytesRead;
+        id0 = id;
+
+        var xv = xv0 + signedVarint.decode(dense.lat, latOffset);
+        latOffset += signedVarint.decode.bytesRead;
+        xv0 = xv;
+
+        var yv = yv0 + signedVarint.decode(dense.lon, lonOffset);
+        lonOffset += signedVarint.decode.bytesRead;
+        yv0 = yv;
+
+        var g = osmdata.granularity || 100;
+        var lat = 0.000000001 * ((osmdata.lat_offset || 0) + (g * xv));
+        var lon = 0.000000001 * ((osmdata.lon_offset || 0) + (g * yv));
+
+        var key = null, tags = {};
+        var sIndex;
+        while((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0 &&
+              kvOffset < dense.keys_vals.length
+             ) {
+            kvOffset += varint.decode.bytesRead;
+
+            var s = stringtable[sIndex];
+            if (key === null) {
+                key = s;
+            } else {
+                tags[key] = s;
+                key = null;
+            }
+        }
+        kvOffset += varint.decode.bytesRead;
+
+        nodes.push({
+            id: id,
+            lat: lat,
+            lon: lon,
+            tags: tags
+        });
+    }
+    return nodes;
 }
