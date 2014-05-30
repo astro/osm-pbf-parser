@@ -3,6 +3,8 @@
 streaming [open street maps](https://wiki.openstreetmap.org) protocol buffer
 parser
 
+[![build status](https://secure.travis-ci.org/substack/osm-pbf-parser.png)](http://travis-ci.org/substack/osm-pbf-parser)
+
 # example
 
 First grab a pbf torrent from: http://osm-torrent.torres.voyager.hr/files/rss.xml
