@@ -139,20 +139,22 @@ function parseDenseNodes (dense, osmdata, stringtable) {
         
         var key = null, tags = {};
         var sIndex;
-        while ((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0
-        && kvOffset < dense.keys_vals.length) {
+        if (dense.keys_vals) {
+            while ((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0
+            && kvOffset < dense.keys_vals.length) {
+                kvOffset += varint.decode.bytesRead;
+                
+                var s = stringtable[sIndex];
+                if (key === null) {
+                    key = s;
+                }
+                else {
+                    tags[key] = s;
+                    key = null;
+                }
+            }
             kvOffset += varint.decode.bytesRead;
-            
-            var s = stringtable[sIndex];
-            if (key === null) {
-                key = s;
-            }
-            else {
-                tags[key] = s;
-                key = null;
-            }
         }
-        kvOffset += varint.decode.bytesRead;
         
         nodes.push({
             id: id,
