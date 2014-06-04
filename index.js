@@ -14,6 +14,7 @@ function Parser () {
     if (!(this instanceof Parser)) return new Parser;
     Transform.call(this);
     this._readableState.objectMode = true;
+    this._readableState.highWaterMark = 0;
     this._writableState.objectMode = false;
     this._mode = SIZE;
     this._waiting = 4;
