@@ -34,5 +34,6 @@
     "email": "mail@substack.net",
     "url": "http://substack.net"
   },
+  "contributors": ["Astro"],
   "license": "MIT"
 }
