@@ -187,8 +187,8 @@ function parseWay (data, stringtable) {
     if (data.refs) {
         var rOffset, r0 = 0;
         for(rOffset = 0; rOffset < data.refs.length; ) {
-            var r = r0 + varint.decode(data.refs, rOffset);
-            rOffset += varint.decode.bytesRead;
+            var r = r0 + signedVarint.decode(data.refs, rOffset);
+            rOffset += signedVarint.decode.bytesRead;
             r0 = r;
             refs.push(r);
         }
