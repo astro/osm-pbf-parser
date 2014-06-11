@@ -75,25 +75,38 @@ Parser.prototype._transform = function write (buf, enc, next) {
             else if (h.type === 'OSMData') {
                 self._osmdata = parsers.osmdata.decode(data);
                 self.stringtable = decodeStringtable(self._osmdata.stringtable);
-                
-                var group = parsers.primitiveGroup.decode(
-                    self._osmdata.primitivegroup
-                );
-                var row = {};
-                if (group.dense_nodes) {
-                    row.type = 'nodes';
-                    var dense = parsers.dense.decode(group.dense_nodes);
-                    row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
-                    self.push(row);
-                }
-                else if (group.way) {
-                    row.type = 'way';
-                    var way = parsers.way.decode(group.way);
-                    row.way = parseWay(way, self.stringtable);
-                    self.push(row);
-                }
-                else {
-                    console.log("Unknown group", group);
+
+                var offset = 0;
+                var buf = self._osmdata.primitivegroup;
+                while(offset < buf.length) {
+	            var prefix = varint.decode(buf, offset);
+	            var type = prefix & 0x7;
+                    if (type !== 2) {
+                        /* Not a length-delimited buffer */
+                        console.warn("primitivegroup buffer contains type", type);
+                        offset = buf.length;
+                    } else {
+                        var nextOffset = offset + varint.decode.bytesRead;
+	                var len = varint.decode(buf, nextOffset);
+                        nextOffset += varint.decode.bytesRead + len;
+                        var buf = buf.slice(offset, nextOffset);
+                        offset = nextOffset;
+                    }
+
+                    var group = parsers.primitiveGroup.decode(buf);
+                    var row = {};
+                    if (group.dense_nodes) {
+                        row.type = 'nodes';
+                        var dense = parsers.dense.decode(group.dense_nodes);
+                        row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
+                        self.push(row);
+                    }
+                    if (group.way) {
+                        row.type = 'way';
+                        var way = parsers.way.decode(group.way);
+                        row.way = parseWay(way, self.stringtable);
+                        self.push(row);
+                    }
                 }
             }
 
