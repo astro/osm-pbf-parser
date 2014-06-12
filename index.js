@@ -100,6 +100,9 @@ Parser.prototype._transform = function write (buf, enc, next) {
                         } else if (group.way) {
                             var way = parsers.way.decode(group.way);
                             parseWay(way, self.stringtable, items);
+                        } else if (group.relation) {
+                            var relation = parsers.relation.decode(group.relation);
+                            parseRelation(relation, self.stringtable, items);
                         }
                     }
                 }
@@ -209,5 +212,62 @@ function parseWay(data, stringtable, results) {
         id: data.id,
         tags: tags,
         refs: refs
+    });
+}
+
+function parseRelation(data, stringtable, results) {
+    var tags = {};
+    if (data.keys && data.values) {
+        var kOffset = 0, vOffset = 0;
+        while (kOffset < data.keys.length && vOffset < data.values.length) {
+            var kIndex = varint.decode(data.keys, kOffset);
+            kOffset += varint.decode.bytesRead;
+            var vIndex = varint.decode(data.values, vOffset);
+            vOffset += varint.decode.bytesRead;
+
+            var key = stringtable[kIndex];
+            var value = stringtable[vIndex];
+            tags[key] = value;
+        }
+    }
+
+    var members = [];
+    var rolesOffset = 0, memidsOffset = 0, typesOffset = 0;
+    var memid0 = 0;
+    while(rolesOffset < data.roles_sid.length) {
+        var role = varint.decode(data.roles_sid, rolesOffset);
+        rolesOffset += varint.decode.bytesRead;
+        var memid = memid0 + signedVarint.decode(data.memids, memidsOffset);
+        memidsOffset += signedVarint.decode.bytesRead;
+        memid0 = memid;
+        var type = varint.decode(data.types, typesOffset);
+        typesOffset += varint.decode.bytesRead;
+        var typeStr;
+        switch(type) {
+        case 0:
+            typeStr = 'node';
+            break;
+        case 1:
+            typeStr = 'way';
+            break;
+        case 2:
+            typeStr = 'relation';
+            break;
+        default:
+            typeStr = '?';
+        }
+
+        members.push({
+            type: typeStr,
+            id: memid,
+            role: stringtable[role]
+        });
+    }
+
+    results.push({
+        type: 'relation',
+        id: data.id,
+        tags: tags,
+        members: members
     });
 }
