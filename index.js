@@ -78,6 +78,7 @@ Parser.prototype._transform = function write (buf, enc, next) {
 
                 var offset = 0;
                 var buf = self._osmdata.primitivegroup;
+                var items = [];
                 while(offset < buf.length) {
 	            var prefix = varint.decode(buf, offset);
 	            var type = prefix & 0x7;
@@ -93,20 +94,18 @@ Parser.prototype._transform = function write (buf, enc, next) {
                         offset = nextOffset;
 
                         var group = parsers.primitiveGroup.decode(primitiveBuf);
-                        var row = {};
                         if (group.dense_nodes) {
-                            row.type = 'nodes';
                             var dense = parsers.dense.decode(group.dense_nodes);
-                            row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
-                            self.push(row);
+                            self.parseDenseNodes(dense, self._osmdata, self.stringtable, items);
                         }
                         if (group.way) {
-                            row.type = 'way';
                             var way = parsers.way.decode(group.way);
-                            row.way = parseWay(way, self.stringtable);
-                            self.push(row);
+                            self.parseWay(way, self.stringtable, items);
                         }
                     }
+                }
+                if (items.length > 0) {
+                    self.push(items);
                 }
             }
 
@@ -130,8 +129,7 @@ function decodeStringtable (buf) {
     return strings;
 }
 
-function parseDenseNodes (dense, osmdata, stringtable) {
-    var nodes = [];
+Parser.prototype.parseDenseNodes = function(dense, osmdata, stringtable, results) {
     var id0 = 0, xv0 = 0, yv0 = 0;
     var idOffset = 0, latOffset = 0, lonOffset = 0, kvOffset = 0;
     while (idOffset < dense.id.length) {
@@ -170,17 +168,17 @@ function parseDenseNodes (dense, osmdata, stringtable) {
             kvOffset += varint.decode.bytesRead;
         }
         
-        nodes.push({
+        results.push({
+            type: 'node',
             id: id,
             lat: lat,
             lon: lon,
             tags: tags
         });
     }
-    return nodes;
 }
 
-function parseWay (data, stringtable) {
+Parser.prototype.parseWay = function(data, stringtable, results) {
     var tags = {};
     if (data.keys && data.values) {
         var kOffset = 0, vOffset = 0;
@@ -207,9 +205,10 @@ function parseWay (data, stringtable) {
         }
     }
 
-    return {
+    results.push({
+        type: 'way',
         id: data.id,
         tags: tags,
         refs: refs
-    };
+    });
 }
