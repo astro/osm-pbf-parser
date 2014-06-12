@@ -96,11 +96,10 @@ Parser.prototype._transform = function write (buf, enc, next) {
                         var group = parsers.primitiveGroup.decode(primitiveBuf);
                         if (group.dense_nodes) {
                             var dense = parsers.dense.decode(group.dense_nodes);
-                            self.parseDenseNodes(dense, self._osmdata, self.stringtable, items);
-                        }
-                        if (group.way) {
+                            parseDenseNodes(dense, self._osmdata, self.stringtable, items);
+                        } else if (group.way) {
                             var way = parsers.way.decode(group.way);
-                            self.parseWay(way, self.stringtable, items);
+                            parseWay(way, self.stringtable, items);
                         }
                     }
                 }
@@ -129,7 +128,7 @@ function decodeStringtable (buf) {
     return strings;
 }
 
-Parser.prototype.parseDenseNodes = function(dense, osmdata, stringtable, results) {
+function parseDenseNodes(dense, osmdata, stringtable, results) {
     var id0 = 0, xv0 = 0, yv0 = 0;
     var idOffset = 0, latOffset = 0, lonOffset = 0, kvOffset = 0;
     while (idOffset < dense.id.length) {
@@ -178,7 +177,7 @@ Parser.prototype.parseDenseNodes = function(dense, osmdata, stringtable, results
     }
 }
 
-Parser.prototype.parseWay = function(data, stringtable, results) {
+function parseWay(data, stringtable, results) {
     var tags = {};
     if (data.keys && data.values) {
         var kOffset = 0, vOffset = 0;
