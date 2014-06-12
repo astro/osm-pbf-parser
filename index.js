@@ -89,23 +89,23 @@ Parser.prototype._transform = function write (buf, enc, next) {
                         var nextOffset = offset + varint.decode.bytesRead;
 	                var len = varint.decode(buf, nextOffset);
                         nextOffset += varint.decode.bytesRead + len;
-                        var buf = buf.slice(offset, nextOffset);
+                        var primitiveBuf = buf.slice(offset, nextOffset);
                         offset = nextOffset;
-                    }
 
-                    var group = parsers.primitiveGroup.decode(buf);
-                    var row = {};
-                    if (group.dense_nodes) {
-                        row.type = 'nodes';
-                        var dense = parsers.dense.decode(group.dense_nodes);
-                        row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
-                        self.push(row);
-                    }
-                    if (group.way) {
-                        row.type = 'way';
-                        var way = parsers.way.decode(group.way);
-                        row.way = parseWay(way, self.stringtable);
-                        self.push(row);
+                        var group = parsers.primitiveGroup.decode(primitiveBuf);
+                        var row = {};
+                        if (group.dense_nodes) {
+                            row.type = 'nodes';
+                            var dense = parsers.dense.decode(group.dense_nodes);
+                            row.nodes = parseDenseNodes(dense, self._osmdata, self.stringtable);
+                            self.push(row);
+                        }
+                        if (group.way) {
+                            row.type = 'way';
+                            var way = parsers.way.decode(group.way);
+                            row.way = parseWay(way, self.stringtable);
+                            self.push(row);
+                        }
                     }
                 }
             }
