@@ -132,8 +132,12 @@ function decodeStringtable (buf) {
 }
 
 function parseDenseNodes(dense, osmdata, stringtable, results) {
+    var denseinfo = dense.denseinfo && parsers.denseinfo.decode(dense.denseinfo);
     var id0 = 0, xv0 = 0, yv0 = 0;
     var idOffset = 0, latOffset = 0, lonOffset = 0, kvOffset = 0;
+    var timestamp = 0, changeset = 0, uid = 0, user_sid = 0;
+    var versionOffset = 0, timestampOffset = 0, changesetOffset = 0;
+    var uidOffset = 0, userOffset = 0, visibleOffset = 0;
     while (idOffset < dense.id.length) {
         var id = id0 + signedVarint.decode(dense.id, idOffset);
         idOffset += signedVarint.decode.bytesRead;
@@ -169,18 +173,53 @@ function parseDenseNodes(dense, osmdata, stringtable, results) {
             }
             kvOffset += varint.decode.bytesRead;
         }
+
+        var info;
+        if (denseinfo) {
+            info = {};
+            info.version = varint.decode(denseinfo.version, versionOffset);
+            versionOffset += varint.decode.bytesRead;
+
+            timestamp += signedVarint.decode(denseinfo.timestamp, timestampOffset);
+            timestampOffset += signedVarint.decode.bytesRead;
+            info.timestamp = timestamp;
+
+            changeset += signedVarint.decode(denseinfo.changeset, changesetOffset);
+            changesetOffset += signedVarint.decode.bytesRead;
+            info.changeset = changeset;
+
+            uid += signedVarint.decode(denseinfo.uid, uidOffset);
+            uidOffset += signedVarint.decode.bytesRead;
+            info.uid = uid;
+
+            user_sid += signedVarint.decode(denseinfo.user_sid, userOffset);
+            userOffset += signedVarint.decode.bytesRead;
+            info.user = stringtable[user_sid];
+
+            if (denseinfo.visible) {
+                info.visible = varint.decode(denseinfo.visible, visibleOffset) !== 0;
+                visibleOffset += varint.decode.bytesRead;
+            }
+        }
         
         results.push({
             type: 'node',
             id: id,
             lat: lat,
             lon: lon,
+            info: info,
             tags: tags
         });
     }
 }
 
 function parseWay(data, stringtable, results) {
+    var info = data.info && parsers.info.decode(data.info);
+    if (info && info.user_sid) {
+        info.user = stringtable[info.user_sid];
+        delete info.user_sid;
+    }
+    
     var tags = {};
     if (data.keys && data.values) {
         var kOffset = 0, vOffset = 0;
@@ -210,12 +249,19 @@ function parseWay(data, stringtable, results) {
     results.push({
         type: 'way',
         id: data.id,
+        info: info,
         tags: tags,
         refs: refs
     });
 }
 
 function parseRelation(data, stringtable, results) {
+    var info = data.info && parsers.info.decode(data.info);
+    if (info && info.user_sid) {
+        info.user = stringtable[info.user_sid];
+        delete info.user_sid;
+    }
+    
     var tags = {};
     if (data.keys && data.values) {
         var kOffset = 0, vOffset = 0;
@@ -267,6 +313,7 @@ function parseRelation(data, stringtable, results) {
     results.push({
         type: 'relation',
         id: data.id,
+        info: info,
         tags: tags,
         members: members
     });
