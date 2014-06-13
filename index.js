@@ -103,6 +103,8 @@ Parser.prototype._transform = function write (buf, enc, next) {
                         } else if (group.relation) {
                             var relation = parsers.relation.decode(group.relation);
                             parseRelation(relation, self.stringtable, items);
+                        } else {
+                            console.warn("Unknown primitive:", group);
                         }
                     }
                 }
