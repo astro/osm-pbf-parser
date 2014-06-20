@@ -1,6 +1,6 @@
 {
   "name": "osm-pbf-parser",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "streaming open street maps protocol buffer parser",
   "main": "index.js",
   "dependencies": {
