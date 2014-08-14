@@ -48,7 +48,7 @@ Parser.prototype._transform = function write (buf, enc, next) {
         write.call(this, buf.slice(4), enc, next);
     }
     else if (this._mode === HEADER) {
-        this._header = parsers.header.decode(buf.slice(0, this._waiting));
+        this._header = parsers.file.BlobHeader.decode(buf.slice(0, this._waiting));
         this._mode = BLOB;
         var nbuf = buf.slice(this._waiting);
         this._offset += this._waiting;
@@ -56,7 +56,7 @@ Parser.prototype._transform = function write (buf, enc, next) {
         write.call(this, nbuf, enc, next);
     }
     else if (this._mode === BLOB) {
-        this._blob = parsers.blob.decode(buf.slice(0, this._waiting));
+        this._blob = parsers.file.Blob.decode(buf.slice(0, this._waiting));
         
         var h = this._header;
         var o = this._offset;
@@ -66,14 +66,16 @@ Parser.prototype._transform = function write (buf, enc, next) {
         this._offset += this._waiting;
         this._waiting = 4;
 
+        // TODO: there is more than just zlib
         zlib.inflate(this._blob.zlib_data, function (err, data) {
             if (err) self.emit('error', err);
             
             if (h.type === 'OSMHeader') {
-                self._osmheader = parsers.osmheader.decode(data);
+                self._osmheader = parsers.osm.HeaderBlock.decode(data);
             }
             else if (h.type === 'OSMData') {
-                self._osmdata = parsers.osmdata.decode(data);
+                self._osmdata = parsers.osm.PrimitiveBlock.decode(data);
+                console.log("PrimitiveBlock", self._osmdata.primitivegroup);
                 self.stringtable = decodeStringtable(self._osmdata.stringtable);
 
                 var offset = 0;
