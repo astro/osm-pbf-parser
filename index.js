@@ -75,7 +75,6 @@ Parser.prototype._transform = function write (buf, enc, next) {
                 if (self._osmheader.required_features.indexOf('HistoricalInformation') >= 0) {
                     self._osmheader.HistoricalInformation = true;
                 }
-                // console.log("header", self._osmheader);
             }
             else if (h.type === 'OSMData') {
                 var block = parsers.osm.PrimitiveBlock.decode(data);
@@ -83,7 +82,6 @@ Parser.prototype._transform = function write (buf, enc, next) {
                 // Output:
                 var items = [];
                 block.primitivegroup.forEach(function(group) {
-                    // console.log("group", JSON.stringify(group));
                     if (group.dense) {
                         parseDenseNodes(group.dense, self._osmheader, stringtable, items);
                     }
@@ -130,8 +128,6 @@ function parseDenseNodes(dense, osmheader, stringtable, results) {
     var dg = osmheader.date_granularity || 1000;
     var timestamp = 0, changeset = 0, uid = 0, user_sid = 0;
     var offset = 0, tagsOffset = 0;
-    // console.log("stringtable", JSON.stringify(stringtable));
-    // console.log("keys_vals", JSON.stringify(dense.keys_vals));
     for(; offset < dense.id.length; offset++) {
         id += dense.id[offset];
         lat += dense.lat[offset];
@@ -250,7 +246,6 @@ function parseRelation(data, osmheader, stringtable, results) {
         relation.info = parseInfo(data.info, osmheader, stringtable);
     }
 
-    // console.log("relation", JSON.stringify(relation));
     results.push(relation);
 }
 
