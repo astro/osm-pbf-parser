@@ -120,7 +120,8 @@ function decodeStringtable (bufs) {
 var NANO = 1e-9;
 
 function parseDenseNodes(dense, osmheader, stringtable, results) {
-    // TODO: schema gives default granularity already!
+    // TODO: schema specifies default granularity/date_granularity already,
+    // https://github.com/mafintosh/protocol-buffers/issues/10
     var g = NANO * (osmheader.granularity || 100);
     var lat0 = NANO * (osmheader.lat_offset || 0);
     var lon0 = NANO * (osmheader.lon_offset || 0);
