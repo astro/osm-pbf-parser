@@ -64,7 +64,9 @@ Parser.prototype._transform = function write (buf, enc, next) {
         this._offset += this._waiting;
         this._waiting = 4;
 
-        // TODO: there is more than just zlib
+        if (!this._blob.zlib_data) {
+            throw "No zlib data, possibly unimplemented raw/lzma/bz2 data";
+        }
         zlib.inflate(this._blob.zlib_data, function (err, data) {
             if (err) self.emit('error', err);
             
