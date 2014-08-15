@@ -72,44 +72,35 @@ Parser.prototype._transform = function write (buf, enc, next) {
             
             if (h.type === 'OSMHeader') {
                 self._osmheader = parsers.osm.HeaderBlock.decode(data);
+                if (self._osmheader.required_features.indexOf('HistoricalInformation') >= 0) {
+                    self._osmheader.HistoricalInformation = true;
+                }
+                // console.log("header", self._osmheader);
             }
             else if (h.type === 'OSMData') {
-                self._osmdata = parsers.osm.PrimitiveBlock.decode(data);
-                console.log("PrimitiveBlock", self._osmdata.primitivegroup);
-                self.stringtable = decodeStringtable(self._osmdata.stringtable);
-
-                var offset = 0;
-                var buf = self._osmdata.primitivegroup;
+                var block = parsers.osm.PrimitiveBlock.decode(data);
+                var stringtable = decodeStringtable(block.stringtable.s);
+                // Output:
                 var items = [];
-                while(offset < buf.length) {
-	            var prefix = varint.decode(buf, offset);
-	            var type = prefix & 0x7;
-                    if (type !== 2) {
-                        /* Not a length-delimited buffer */
-                        console.warn("primitivegroup buffer contains type", type);
-                        offset = buf.length;
-                    } else {
-                        var nextOffset = offset + varint.decode.bytesRead;
-	                var len = varint.decode(buf, nextOffset);
-                        nextOffset += varint.decode.bytesRead + len;
-                        var primitiveBuf = buf.slice(offset, nextOffset);
-                        offset = nextOffset;
-
-                        var group = parsers.primitiveGroup.decode(primitiveBuf);
-                        if (group.dense_nodes) {
-                            var dense = parsers.dense.decode(group.dense_nodes);
-                            parseDenseNodes(dense, self._osmdata, self.stringtable, items);
-                        } else if (group.way) {
-                            var way = parsers.way.decode(group.way);
-                            parseWay(way, self.stringtable, items);
-                        } else if (group.relation) {
-                            var relation = parsers.relation.decode(group.relation);
-                            parseRelation(relation, self.stringtable, items);
-                        } else {
-                            console.warn("Unknown primitive:", group);
-                        }
+                block.primitivegroup.forEach(function(group) {
+                    // console.log("group", JSON.stringify(group));
+                    if (group.dense) {
+                        parseDenseNodes(group.dense, self._osmheader, stringtable, items);
                     }
-                }
+                    group.ways.forEach(function(way) {
+                        parseWay(way, self._osmheader, stringtable, items);
+                    });
+                    group.relations.forEach(function(relation) {
+                        parseRelation(relation, self._osmheader, stringtable, items);
+                    });
+                    if (group.nodes && group.nodes.length > 0) {
+                        console.warn(group.nodes.length + " unimplemented nodes");
+                    }
+                    if (group.changesets && group.changesets.length > 0) {
+                        console.warn(group.changesets.length + " unimplemented changesets");
+                    }
+                });
+
                 if (items.length > 0) {
                     self.push(items);
                 }
@@ -120,180 +111,115 @@ Parser.prototype._transform = function write (buf, enc, next) {
     }
 }
 
-function decodeStringtable (buf) {
-    var strings = [];
-    for(var i = 0; i < buf.length; ) {
-        // Skip tag
-        i += 1;
-        // Read length
-        var len = varint.decode(buf, i);
-        i += varint.decode.bytesRead;
-        // Extract string
-        strings.push(buf.slice(i, i + len).toString());
-        i += len;
-    }
-    return strings;
+function decodeStringtable (bufs) {
+    return bufs.map(function(buf) {
+            if (!Buffer.isBuffer(buf))
+                throw "no buffer";
+            return buf.toString('utf8');
+        });
 }
 
-function parseDenseNodes(dense, osmdata, stringtable, results) {
-    var denseinfo = dense.denseinfo && parsers.denseinfo.decode(dense.denseinfo);
-    var id0 = 0, xv0 = 0, yv0 = 0;
-    var idOffset = 0, latOffset = 0, lonOffset = 0, kvOffset = 0;
+var NANO = 1e-9;
+
+function parseDenseNodes(dense, osmheader, stringtable, results) {
+    // TODO: schema gives default granularity already!
+    var g = NANO * (osmheader.granularity || 100);
+    var lat0 = NANO * (osmheader.lat_offset || 0);
+    var lon0 = NANO * (osmheader.lon_offset || 0);
+    var id = 0, lat = 0, lon = 0;
+    var dg = osmheader.date_granularity || 1000;
     var timestamp = 0, changeset = 0, uid = 0, user_sid = 0;
-    var versionOffset = 0, timestampOffset = 0, changesetOffset = 0;
-    var uidOffset = 0, userOffset = 0, visibleOffset = 0;
-    while (idOffset < dense.id.length) {
-        var id = id0 + signedVarint.decode(dense.id, idOffset);
-        idOffset += signedVarint.decode.bytesRead;
-        id0 = id;
-        
-        var xv = xv0 + signedVarint.decode(dense.lat, latOffset);
-        latOffset += signedVarint.decode.bytesRead;
-        xv0 = xv;
-        
-        var yv = yv0 + signedVarint.decode(dense.lon, lonOffset);
-        lonOffset += signedVarint.decode.bytesRead;
-        yv0 = yv;
-        
-        var g = osmdata.granularity || 100;
-        var lat = 0.000000001 * ((osmdata.lat_offset || 0) + (g * xv));
-        var lon = 0.000000001 * ((osmdata.lon_offset || 0) + (g * yv));
-        
-        var key = null, tags = {};
-        var sIndex;
-        if (dense.keys_vals) {
-            while ((sIndex = varint.decode(dense.keys_vals, kvOffset)) != 0
-            && kvOffset < dense.keys_vals.length) {
-                kvOffset += varint.decode.bytesRead;
-                
-                var s = stringtable[sIndex];
-                if (key === null) {
-                    key = s;
-                }
-                else {
-                    tags[key] = s;
-                    key = null;
-                }
-            }
-            kvOffset += varint.decode.bytesRead;
+    var offset = 0, tagsOffset = 0;
+    // console.log("stringtable", JSON.stringify(stringtable));
+    // console.log("keys_vals", JSON.stringify(dense.keys_vals));
+    for(; offset < dense.id.length; offset++) {
+        id += dense.id[offset];
+        lat += dense.lat[offset];
+        lon += dense.lon[offset];
+        var tags = {};
+        for(; tagsOffset < dense.keys_vals.length - 1 && dense.keys_vals[tagsOffset] !== 0; tagsOffset += 2) {
+            var k = stringtable[dense.keys_vals[tagsOffset]];
+            var v = stringtable[dense.keys_vals[tagsOffset + 1]];
+            tags[k] = v;
         }
+        // Skip the 0
+        tagsOffset += 1;
 
-        var info;
-        if (denseinfo) {
-            info = {};
-            info.version = varint.decode(denseinfo.version, versionOffset);
-            versionOffset += varint.decode.bytesRead;
-
-            timestamp += signedVarint.decode(denseinfo.timestamp, timestampOffset);
-            timestampOffset += signedVarint.decode.bytesRead;
-            info.timestamp = timestamp;
-
-            changeset += signedVarint.decode(denseinfo.changeset, changesetOffset);
-            changesetOffset += signedVarint.decode.bytesRead;
-            info.changeset = changeset;
-
-            uid += signedVarint.decode(denseinfo.uid, uidOffset);
-            uidOffset += signedVarint.decode.bytesRead;
-            info.uid = uid;
-
-            user_sid += signedVarint.decode(denseinfo.user_sid, userOffset);
-            userOffset += signedVarint.decode.bytesRead;
-            info.user = stringtable[user_sid];
-
-            if (denseinfo.visible) {
-                info.visible = varint.decode(denseinfo.visible, visibleOffset) !== 0;
-                visibleOffset += varint.decode.bytesRead;
-            }
-        }
-        
-        results.push({
+        var node = {
             type: 'node',
             id: id,
-            lat: lat,
-            lon: lon,
-            info: info,
+            lat: lat0 + g * lat,
+            lon: lon0 + g * lon,
             tags: tags
-        });
+        };
+
+
+        var dInfo;
+        if ((dInfo = dense.denseinfo)) {
+            timestamp += dInfo.timestamp[offset];
+            changeset += dInfo.changeset[offset];
+            uid += dInfo.uid[offset];
+            user_sid += dInfo.user_sid[offset];
+            node.info = {
+                version: dInfo.version[offset],
+                id: id,
+                timestamp: dg * timestamp,
+                changeset: changeset,
+                uid: uid,
+                user: stringtable[user_sid]
+            };
+            if (osmheader.HistoricalInformation && dInfo.hasOwnProperty('visible')) {
+                node.info.visible = dInfo.visible[offset];
+            }
+        }
+
+        results.push(node);
     }
 }
 
-function parseWay(data, stringtable, results) {
-    var info = data.info && parsers.info.decode(data.info);
-    if (info && info.user_sid) {
-        info.user = stringtable[info.user_sid];
-        delete info.user_sid;
-    }
-    
+function parseWay(data, osmheader, stringtable, results) {
     var tags = {};
-    if (data.keys && data.values) {
-        var kOffset = 0, vOffset = 0;
-        while (kOffset < data.keys.length && vOffset < data.values.length) {
-            var kIndex = varint.decode(data.keys, kOffset);
-            kOffset += varint.decode.bytesRead;
-            var vIndex = varint.decode(data.values, vOffset);
-            vOffset += varint.decode.bytesRead;
-
-            var key = stringtable[kIndex];
-            var value = stringtable[vIndex];
-            tags[key] = value;
-        }
+    for(var i = 0; i < data.keys.length && i < data.vals.length; i++) {
+        var k = stringtable[data.keys[i]];
+        var v = stringtable[data.vals[i]];
+        tags[k] = v;
     }
 
-    var refs = [];
-    if (data.refs) {
-        var rOffset, r0 = 0;
-        for(rOffset = 0; rOffset < data.refs.length; ) {
-            var r = r0 + signedVarint.decode(data.refs, rOffset);
-            rOffset += signedVarint.decode.bytesRead;
-            r0 = r;
-            refs.push(r);
-        }
-    }
+    var ref = 0;
+    var refs = data.refs.map(function(ref1) {
+        ref += ref1;
+        return ref;
+    });
 
-    results.push({
+    var way = {
         type: 'way',
         id: data.id,
-        info: info,
         tags: tags,
         refs: refs
-    });
+    };
+
+    if (data.info) {
+        way.info = parseInfo(data.info, osmheader, stringtable);
+    }
+
+    results.push(way);
 }
 
-function parseRelation(data, stringtable, results) {
-    var info = data.info && parsers.info.decode(data.info);
-    if (info && info.user_sid) {
-        info.user = stringtable[info.user_sid];
-        delete info.user_sid;
-    }
-    
+function parseRelation(data, osmheader, stringtable, results) {
+    var i;
     var tags = {};
-    if (data.keys && data.values) {
-        var kOffset = 0, vOffset = 0;
-        while (kOffset < data.keys.length && vOffset < data.values.length) {
-            var kIndex = varint.decode(data.keys, kOffset);
-            kOffset += varint.decode.bytesRead;
-            var vIndex = varint.decode(data.values, vOffset);
-            vOffset += varint.decode.bytesRead;
-
-            var key = stringtable[kIndex];
-            var value = stringtable[vIndex];
-            tags[key] = value;
-        }
+    for(i = 0; i < data.keys.length && i < data.vals.length; i++) {
+        var k = stringtable[data.keys[i]];
+        var v = stringtable[data.vals[i]];
+        tags[k] = v;
     }
 
+    var id = 0;
     var members = [];
-    var rolesOffset = 0, memidsOffset = 0, typesOffset = 0;
-    var memid0 = 0;
-    while(rolesOffset < data.roles_sid.length) {
-        var role = varint.decode(data.roles_sid, rolesOffset);
-        rolesOffset += varint.decode.bytesRead;
-        var memid = memid0 + signedVarint.decode(data.memids, memidsOffset);
-        memidsOffset += signedVarint.decode.bytesRead;
-        memid0 = memid;
-        var type = varint.decode(data.types, typesOffset);
-        typesOffset += varint.decode.bytesRead;
+    for(i = 0; i < data.roles_sid.length && i < data.memids.length && i < data.types.length; i++) {
+        id += data.memids[i];
         var typeStr;
-        switch(type) {
+        switch(data.types[i]) {
         case 0:
             typeStr = 'node';
             break;
@@ -309,16 +235,36 @@ function parseRelation(data, stringtable, results) {
 
         members.push({
             type: typeStr,
-            id: memid,
-            role: stringtable[role]
+            id: id,
+            role: stringtable[data.roles_sid[i]]
         });
     }
 
-    results.push({
+    var relation = {
         type: 'relation',
         id: data.id,
-        info: info,
         tags: tags,
         members: members
-    });
+    };
+    if (data.info) {
+        relation.info = parseInfo(data.info, osmheader, stringtable);
+    }
+
+    // console.log("relation", JSON.stringify(relation));
+    results.push(relation);
+}
+
+function parseInfo(dInfo, osmheader, stringtable) {
+    var dg = osmheader.date_granularity || 1000;
+    var info = {
+        version: dInfo.version,
+        timestamp: dg * dInfo.timestamp,
+        changeset: dInfo.changeset,
+        uid: dInfo.uid,
+        user: stringtable[dInfo.user_sid]
+    };
+    if (osmheader.HistoricalInformation && dInfo.hasOwnProperty('visible')) {
+        info.visible = dInfo.visible;
+    }
+    return info;
 }
