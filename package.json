@@ -13,7 +13,8 @@
     "through2": "~0.4.1"
   },
   "scripts": {
-    "test": "tape test/*.js"
+    "test": "tape test/*.js",
+    "pretest": "test/extracts/fetch.sh"
   },
   "repository": {
     "type": "git",
