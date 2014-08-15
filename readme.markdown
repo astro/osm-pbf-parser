@@ -19,7 +19,9 @@ var osm = parseOSM();
 fs.createReadStream(process.argv[2])
     .pipe(osm)
     .pipe(through.obj(function (row, enc, next) {
-        console.log('row=', row);
+        row.forEach(function (el) {
+            console.log('el=', el);
+        });
         next();
     }))
 ;
@@ -29,22 +31,7 @@ Then you can parse the results:
 
 ```
 $ node parser osm.pbf | head -n15
-row= { type: 'group',
-  points: 
-   [ [ 50.1241068, 14.4525579 ],
-     [ 1.2565819, -5.0923996 ],
-     [ -47.296883400000006, 64.1520888 ],
-     [ 47.2562488, -64.030435 ],
-     [ 0.0330501, 0.0311937 ],
-     [ 0.5727711000000001, -9.7199858 ],
-     [ -0.007692300000000001, -0.061653000000000006 ],
-     [ -0.007973000000000001, -0.005645000000000001 ],
-     [ -0.07851000000000001, 0.01217 ],
-     [ 0.047546000000000005, 0.149149 ],
-     [ -0.0029237, -0.035571200000000004 ],
-     [ 0.0001663, 0.0005541000000000001 ],
-     [ 0.0037239, 0.0021202 ],
-row= {
+el= {
   type: 'node',
   id: 122321,
   lat: 53.527972600000005,
@@ -59,7 +46,7 @@ row= {
      user: 'glühwürmchen'
   }
 }
-row= {
+el= {
   type: 'way',
   id: 108,
   tags: {
@@ -76,7 +63,7 @@ row= {
      user: 'Ropino'
   }
 }
-row= {
+el= {
   type: 'relation',
   id: 3030,
   tags: { layer: '1', type: 'bridge' },
