@@ -21,6 +21,6 @@ test('auckland first 50 rows', function (t) {
             if (expected.length === 0) break;
         }
         if (expected.length > 0) next();
-        else rs.close();
+        else if (rs.close) rs.close();
     }
 });
