@@ -15,8 +15,11 @@
   },
   "scripts": {
     "test": "tape test/*.js",
-    "browser-test": "browserify test/*.js | testling",
+    "browser-test": "browserify -t brfs test/*.js | testling",
     "pretest": "test/extracts/fetch.sh"
+  },
+  "browserify": {
+    "transform": [ "brfs" ]
   },
   "repository": {
     "type": "git",
