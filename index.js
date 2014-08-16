@@ -25,6 +25,8 @@ function Parser () {
     this._sizeOffset = null;
 }
 
+var NANO = 1e-9;
+
 Parser.prototype._transform = function write (buf, enc, next) {
     var self = this;
     
@@ -72,24 +74,28 @@ Parser.prototype._transform = function write (buf, enc, next) {
             
             if (h.type === 'OSMHeader') {
                 self._osmheader = parsers.osm.HeaderBlock.decode(data);
-                if (self._osmheader.required_features.indexOf('HistoricalInformation') >= 0) {
-                    self._osmheader.HistoricalInformation = true;
-                }
             }
             else if (h.type === 'OSMData') {
                 var block = parsers.osm.PrimitiveBlock.decode(data);
-                var stringtable = decodeStringtable(block.stringtable.s);
+                var opts = {
+                    stringtable: decodeStringtable(block.stringtable.s),
+                    granularity: NANO * block.granularity,
+                    lat_offset: NANO * block.lat_offset,
+                    lon_offset: NANO * block.lon_offset,
+                    date_granularity: block.date_granularity,
+                    HistoricalInformation: self._osmheader.required_features.indexOf('HistoricalInformation') >= 0
+                };
                 // Output:
                 var items = [];
                 block.primitivegroup.forEach(function(group) {
                     if (group.dense) {
-                        parseDenseNodes(group.dense, self._osmheader, stringtable, items);
+                        parseDenseNodes(group.dense, opts, items);
                     }
                     group.ways.forEach(function(way) {
-                        parseWay(way, self._osmheader, stringtable, items);
+                        parseWay(way, opts, items);
                     });
                     group.relations.forEach(function(relation) {
-                        parseRelation(relation, self._osmheader, stringtable, items);
+                        parseRelation(relation, opts, items);
                     });
                     if (group.nodes && group.nodes.length > 0) {
                         console.warn(group.nodes.length + " unimplemented nodes");
@@ -117,16 +123,8 @@ function decodeStringtable (bufs) {
         });
 }
 
-var NANO = 1e-9;
-
-function parseDenseNodes(dense, osmheader, stringtable, results) {
-    // TODO: schema specifies default granularity/date_granularity already,
-    // https://github.com/mafintosh/protocol-buffers/issues/10
-    var g = NANO * (osmheader.granularity || 100);
-    var lat0 = NANO * (osmheader.lat_offset || 0);
-    var lon0 = NANO * (osmheader.lon_offset || 0);
+function parseDenseNodes(dense, opts, results) {
     var id = 0, lat = 0, lon = 0;
-    var dg = osmheader.date_granularity || 1000;
     var timestamp = 0, changeset = 0, uid = 0, user_sid = 0;
     var offset = 0, tagsOffset = 0;
     for(; offset < dense.id.length; offset++) {
@@ -135,8 +133,8 @@ function parseDenseNodes(dense, osmheader, stringtable, results) {
         lon += dense.lon[offset];
         var tags = {};
         for(; tagsOffset < dense.keys_vals.length - 1 && dense.keys_vals[tagsOffset] !== 0; tagsOffset += 2) {
-            var k = stringtable[dense.keys_vals[tagsOffset]];
-            var v = stringtable[dense.keys_vals[tagsOffset + 1]];
+            var k = opts.stringtable[dense.keys_vals[tagsOffset]];
+            var v = opts.stringtable[dense.keys_vals[tagsOffset + 1]];
             tags[k] = v;
         }
         // Skip the 0
@@ -145,8 +143,8 @@ function parseDenseNodes(dense, osmheader, stringtable, results) {
         var node = {
             type: 'node',
             id: id,
-            lat: lat0 + g * lat,
-            lon: lon0 + g * lon,
+            lat: opts.lat_offset + opts.granularity * lat,
+            lon: opts.lon_offset + opts.granularity * lon,
             tags: tags
         };
 
@@ -160,12 +158,12 @@ function parseDenseNodes(dense, osmheader, stringtable, results) {
             node.info = {
                 version: dInfo.version[offset],
                 id: id,
-                timestamp: dg * timestamp,
+                timestamp: opts.date_granularity * timestamp,
                 changeset: changeset,
                 uid: uid,
-                user: stringtable[user_sid]
+                user: opts.stringtable[user_sid]
             };
-            if (osmheader.HistoricalInformation && dInfo.hasOwnProperty('visible')) {
+            if (opts.HistoricalInformation && dInfo.hasOwnProperty('visible')) {
                 node.info.visible = dInfo.visible[offset];
             }
         }
@@ -174,11 +172,11 @@ function parseDenseNodes(dense, osmheader, stringtable, results) {
     }
 }
 
-function parseWay(data, osmheader, stringtable, results) {
+function parseWay(data, opts, results) {
     var tags = {};
     for(var i = 0; i < data.keys.length && i < data.vals.length; i++) {
-        var k = stringtable[data.keys[i]];
-        var v = stringtable[data.vals[i]];
+        var k = opts.stringtable[data.keys[i]];
+        var v = opts.stringtable[data.vals[i]];
         tags[k] = v;
     }
 
@@ -196,18 +194,18 @@ function parseWay(data, osmheader, stringtable, results) {
     };
 
     if (data.info) {
-        way.info = parseInfo(data.info, osmheader, stringtable);
+        way.info = parseInfo(data.info, opts);
     }
 
     results.push(way);
 }
 
-function parseRelation(data, osmheader, stringtable, results) {
+function parseRelation(data, opts, results) {
     var i;
     var tags = {};
     for(i = 0; i < data.keys.length && i < data.vals.length; i++) {
-        var k = stringtable[data.keys[i]];
-        var v = stringtable[data.vals[i]];
+        var k = opts.stringtable[data.keys[i]];
+        var v = opts.stringtable[data.vals[i]];
         tags[k] = v;
     }
 
@@ -233,7 +231,7 @@ function parseRelation(data, osmheader, stringtable, results) {
         members.push({
             type: typeStr,
             id: id,
-            role: stringtable[data.roles_sid[i]]
+            role: opts.stringtable[data.roles_sid[i]]
         });
     }
 
@@ -244,22 +242,21 @@ function parseRelation(data, osmheader, stringtable, results) {
         members: members
     };
     if (data.info) {
-        relation.info = parseInfo(data.info, osmheader, stringtable);
+        relation.info = parseInfo(data.info, opts);
     }
 
     results.push(relation);
 }
 
-function parseInfo(dInfo, osmheader, stringtable) {
-    var dg = osmheader.date_granularity || 1000;
+function parseInfo(dInfo, opts) {
     var info = {
         version: dInfo.version,
-        timestamp: dg * dInfo.timestamp,
+        timestamp: opts.date_granularity * dInfo.timestamp,
         changeset: dInfo.changeset,
         uid: dInfo.uid,
-        user: stringtable[dInfo.user_sid]
+        user: opts.stringtable[dInfo.user_sid]
     };
-    if (osmheader.HistoricalInformation && dInfo.hasOwnProperty('visible')) {
+    if (opts.HistoricalInformation && dInfo.hasOwnProperty('visible')) {
         info.visible = dInfo.visible;
     }
     return info;
