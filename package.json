@@ -15,6 +15,7 @@
   },
   "scripts": {
     "test": "tape test/*.js",
+    "browser-test": "browserify test/*.js | testling",
     "pretest": "test/extracts/fetch.sh"
   },
   "repository": {
