@@ -18,9 +18,9 @@ var parseOSM = require('osm-pbf-parser');
 var osm = parseOSM();
 fs.createReadStream(process.argv[2])
     .pipe(osm)
-    .pipe(through.obj(function (row, enc, next) {
-        row.forEach(function (el) {
-            console.log('el=', el);
+    .pipe(through.obj(function (items, enc, next) {
+        items.forEach(function (item) {
+            console.log('item=', item);
         });
         next();
     }))
@@ -31,7 +31,7 @@ Then you can parse the results:
 
 ```
 $ node parser osm.pbf | head -n15
-el= {
+item= {
   type: 'node',
   id: 122321,
   lat: 53.527972600000005,
@@ -46,7 +46,7 @@ el= {
      user: 'glühwürmchen'
   }
 }
-el= {
+item= {
   type: 'way',
   id: 108,
   tags: {
@@ -63,7 +63,7 @@ el= {
      user: 'Ropino'
   }
 }
-el= {
+item= {
   type: 'relation',
   id: 3030,
   tags: { layer: '1', type: 'bridge' },
