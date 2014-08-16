@@ -4,6 +4,7 @@
   "description": "streaming open street maps protocol buffer parser",
   "main": "index.js",
   "dependencies": {
+    "brfs": "^1.2.0",
     "inherits": "^2.0.1",
     "protocol-buffers": "^2.3.4",
     "readable-stream": "^1.0.27-1"
@@ -33,6 +34,8 @@
     "email": "mail@substack.net",
     "url": "http://substack.net"
   },
-  "contributors": ["Astro"],
+  "contributors": [
+    "Astro"
+  ],
   "license": "MIT and LGPL"
 }
