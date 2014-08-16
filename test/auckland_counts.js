@@ -4,7 +4,7 @@ var path = require('path');
 var parser = require('../');
 var through = require('through2');
 
-test('auckland', function (t) {
+test('auckland counts', function (t) {
     t.plan(1);
     var osm = parser();
     var counts = {};
