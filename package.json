@@ -34,5 +34,5 @@
     "url": "http://substack.net"
   },
   "contributors": ["Astro"],
-  "license": "MIT"
+  "license": "MIT and LGPL"
 }
