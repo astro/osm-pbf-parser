@@ -157,7 +157,6 @@ function parseDenseNodes(dense, opts, results) {
             user_sid += dInfo.user_sid[offset];
             node.info = {
                 version: dInfo.version[offset],
-                id: id,
                 timestamp: opts.date_granularity * timestamp,
                 changeset: changeset,
                 uid: uid,
