@@ -1,5 +1,6 @@
 var bun = require('bun');
-var BlobParser = require('./lib/blob');
+var BlobParser = require('./lib/blob_parser');
+var BlobEncoder = require('./lib/blob_encoder');
 var BlobDecompressor = require('./lib/decompress');
 var PrimitivesParser = require('./lib/primitives');
 
@@ -17,5 +18,6 @@ module.exports = function() {
 
 /* Individual exports */
 module.exports.BlobParser = BlobParser;
+module.exports.BlobEncoder = BlobEncoder;
 module.exports.BlobDecompressor = BlobDecompressor;
 module.exports.PrimitivesParser = PrimitivesParser;
