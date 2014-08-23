@@ -97,6 +97,11 @@ stream as input and produces parsed objectMode rows as output.
 
 Each `row` from the output stream has a `row.type`.
 
+# parallel processing
+
+The module exposes `BlobParser` and `BlobEncoder` so that you
+distribute binary work units for parsing. See the `pstats` example.
+
 # install
 
 With [npm](https://npmjs.org) do:
